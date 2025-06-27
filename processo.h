@@ -9,9 +9,6 @@
 // Tamanho máximo de processo (potência de 2)
 #define TAMANHO_MAX_PROCESSO (64 * 1024) // 64 KB
 
-// Número máximo de páginas por processo
-#define MAX_PAGINAS_PROCESSO (TAMANHO_MAX_PROCESSO / TAMANHO_PAGINA)
-
 // Número máximo de processos suportados
 #define MAX_PROCESSOS 10
 
@@ -27,7 +24,7 @@ typedef struct {
     int id;                                    // ID único do processo
     int tamanho;                              // Tamanho da memória lógica em bytes
     unsigned char memoria_logica[TAMANHO_MAX_PROCESSO]; // Memória lógica do processo
-    EntradaTabelaPagina tabela_paginas[MAX_PAGINAS_PROCESSO]; // Tabela de páginas
+    EntradaTabelaPagina *tabela_paginas;      // Tabela de páginas (alocada dinamicamente)
     int num_paginas;                          // Número de páginas utilizadas pelo processo
     int ativo;                                // 1 se o processo está ativo, 0 caso contrário
 } Processo;
@@ -53,10 +50,12 @@ void inicializar_gerenciador_processos(GerenciadorProcessos *gp);
  * 
  * @param gp Ponteiro para o gerenciador de processos.
  * @param mf Ponteiro para a memória física.
+ * @param id_processo ID específico do processo.
  * @param tamanho Tamanho do processo em bytes.
+ * @param tamanho_pagina Tamanho da página em bytes.
  * @return ID do processo criado, ou -1 se falhar.
  */
-int criar_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int tamanho);
+int criar_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int id_processo, int tamanho, int tamanho_pagina);
 
 /**
  * @brief Aloca quadros físicos para as páginas de um processo.
@@ -122,8 +121,16 @@ void gerar_dados_aleatorios_processo(Processo *processo);
  * @brief Calcula o número de páginas necessárias para um tamanho de processo.
  * 
  * @param tamanho Tamanho do processo em bytes.
+ * @param tamanho_pagina Tamanho da página em bytes.
  * @return Número de páginas necessárias.
  */
-int calcular_num_paginas(int tamanho);
+int calcular_num_paginas(int tamanho, int tamanho_pagina);
+
+/**
+ * @brief Libera a memória alocada para um processo.
+ * 
+ * @param processo Ponteiro para o processo.
+ */
+void liberar_processo(Processo *processo);
 
 #endif // PROCESSO_H 

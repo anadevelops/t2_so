@@ -4,22 +4,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// Define o tamanho da memória física em bytes
-#define TAMANHO_MEMORIA_FISICA (1024 * 1024) // 1 MB
-
-// Define o tamanho de cada página/quadro em bytes
-#define TAMANHO_PAGINA 4096 // 4 KB
-
-// Calcula o número total de quadros na memória física
-#define NUMERO_QUADROS (TAMANHO_MEMORIA_FISICA / TAMANHO_PAGINA)
-
 // Estrutura para representar a memória física
 typedef struct {
-    unsigned char memoria[TAMANHO_MEMORIA_FISICA]; // A memória física como um array de bytes
-    int quadro_livre[NUMERO_QUADROS];                // Um mapa de bits para rastrear quadros livres/ocupados (1 para livre, 0 para ocupado)
+    unsigned char *memoria;           // Ponteiro para a memória física alocada dinamicamente
+    int *quadro_livre;                // Um mapa de bits para rastrear quadros livres/ocupados (1 para livre, 0 para ocupado)
+    int tamanho_memoria;              // Tamanho total da memória em bytes
+    int tamanho_pagina;               // Tamanho de cada página/quadro em bytes
+    int numero_quadros;               // Número total de quadros na memória física
 } MemoriaFisica;
 
 // Protótipos das funções de gerenciamento da memória física
+
+/**
+ * @brief Cria e inicializa a memória física com tamanho e tamanho de quadro especificados pelo usuário.
+ * 
+ * @param tamanho_mb Tamanho da memória em megabytes.
+ * @param tamanho_pagina_kb Tamanho de cada página/quadro em kilobytes.
+ * @return Ponteiro para a estrutura da Memória Física alocada, ou NULL em caso de erro.
+ */
+MemoriaFisica* criar_memoria_fisica(int tamanho_mb, int tamanho_pagina_kb);
 
 /**
  * @brief Inicializa a memória física, marcando todos os quadros como livres.
@@ -27,6 +30,13 @@ typedef struct {
  * @param mf Ponteiro para a estrutura da Memória Física.
  */
 void inicializar_memoria_fisica(MemoriaFisica *mf);
+
+/**
+ * @brief Libera a memória física alocada dinamicamente.
+ * 
+ * @param mf Ponteiro para a estrutura da Memória Física.
+ */
+void destruir_memoria_fisica(MemoriaFisica *mf);
 
 /**
  * @brief Aloca um quadro livre na memória física.
@@ -61,5 +71,20 @@ void escrever_na_memoria(MemoriaFisica *mf, int endereco_fisico, unsigned char v
  * @return O byte lido do endereço.
  */
 unsigned char ler_da_memoria(MemoriaFisica *mf, int endereco_fisico);
+
+/**
+ * @brief Exibe informações sobre o estado atual da memória física.
+ * 
+ * @param mf Ponteiro para a estrutura da Memória Física.
+ */
+void exibir_status_memoria(MemoriaFisica *mf);
+
+/**
+ * @brief Exibe uma visualização visual dos quadros livres e ocupados.
+ * 
+ * @param mf Ponteiro para a estrutura da Memória Física.
+ * @param quadros_por_linha Número de quadros a serem exibidos por linha (padrão: 32).
+ */
+void visualizar_quadros_memoria(MemoriaFisica *mf, int quadros_por_linha);
 
 #endif // MEMORIA_H 

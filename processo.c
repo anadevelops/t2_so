@@ -11,21 +11,15 @@ void inicializar_gerenciador_processos(GerenciadorProcessos *gp) {
         gp->processos[i].id = 0;
         gp->processos[i].tamanho = 0;
         gp->processos[i].num_paginas = 0;
-        
-        // Inicializa a tabela de páginas
-        for (int j = 0; j < MAX_PAGINAS_PROCESSO; j++) {
-            gp->processos[i].tabela_paginas[j].quadro_fisico = -1;
-            gp->processos[i].tabela_paginas[j].presente = 0;
-            gp->processos[i].tabela_paginas[j].modificada = 0;
-        }
+        gp->processos[i].tabela_paginas = NULL;
     }
     
     printf("Gerenciador de processos inicializado.\n");
 }
 
-int calcular_num_paginas(int tamanho) {
-    int num_paginas = tamanho / TAMANHO_PAGINA;
-    if (tamanho % TAMANHO_PAGINA != 0) {
+int calcular_num_paginas(int tamanho, int tamanho_pagina) {
+    int num_paginas = tamanho / tamanho_pagina;
+    if (tamanho % tamanho_pagina != 0) {
         num_paginas++; // Arredonda para cima
     }
     return num_paginas;
@@ -38,20 +32,26 @@ void gerar_dados_aleatorios_processo(Processo *processo) {
         processo->memoria_logica[i] = rand() % 256; // Valores de 0 a 255
     }
     
-    printf("Dados aleatórios gerados para o processo %d (%d bytes).\n", 
+    printf("Dados aleatorios gerados para o processo %d (%d bytes).\n", 
            processo->id, processo->tamanho);
 }
 
-int criar_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int tamanho) {
+int criar_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int id_processo, int tamanho, int tamanho_pagina) {
     // Verifica se há espaço para mais processos
     if (gp->num_processos >= MAX_PROCESSOS) {
-        printf("Erro: Número máximo de processos atingido (%d).\n", MAX_PROCESSOS);
+        printf("Erro: Numero maximo de processos atingido (%d).\n", MAX_PROCESSOS);
+        return -1;
+    }
+    
+    // Verifica se o ID já existe
+    if (encontrar_processo(gp, id_processo)) {
+        printf("Erro: Processo com ID %d ja existe.\n", id_processo);
         return -1;
     }
     
     // Verifica se o tamanho é válido
     if (tamanho <= 0 || tamanho > TAMANHO_MAX_PROCESSO) {
-        printf("Erro: Tamanho de processo inválido (%d). Deve estar entre 1 e %d bytes.\n", 
+        printf("Erro: Tamanho de processo invalido (%d). Deve estar entre 1 e %d bytes.\n", 
                tamanho, TAMANHO_MAX_PROCESSO);
         return -1;
     }
@@ -66,19 +66,27 @@ int criar_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int tamanho) {
     }
     
     if (slot_livre == -1) {
-        printf("Erro: Não foi possível encontrar um slot livre para o processo.\n");
+        printf("Erro: Nao foi possivel encontrar um slot livre para o processo.\n");
         return -1;
     }
     
     // Cria o processo
     Processo *processo = &gp->processos[slot_livre];
-    processo->id = gp->proximo_id++;
+    processo->id = id_processo;
     processo->tamanho = tamanho;
-    processo->num_paginas = calcular_num_paginas(tamanho);
+    processo->num_paginas = calcular_num_paginas(tamanho, tamanho_pagina);
     processo->ativo = 1;
     
+    // Aloca a tabela de páginas dinamicamente
+    processo->tabela_paginas = (EntradaTabelaPagina*)malloc(processo->num_paginas * sizeof(EntradaTabelaPagina));
+    if (!processo->tabela_paginas) {
+        printf("Erro: Falha ao alocar tabela de paginas para o processo %d.\n", processo->id);
+        processo->ativo = 0;
+        return -1;
+    }
+    
     // Inicializa a tabela de páginas
-    for (int i = 0; i < MAX_PAGINAS_PROCESSO; i++) {
+    for (int i = 0; i < processo->num_paginas; i++) {
         processo->tabela_paginas[i].quadro_fisico = -1;
         processo->tabela_paginas[i].presente = 0;
         processo->tabela_paginas[i].modificada = 0;
@@ -90,7 +98,7 @@ int criar_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int tamanho) {
     // Aloca quadros físicos para o processo
     if (!alocar_quadros_processo(gp, mf, processo->id)) {
         printf("Erro: Falha ao alocar quadros para o processo %d.\n", processo->id);
-        processo->ativo = 0; // Marca como inativo
+        liberar_processo(processo);
         return -1;
     }
     
@@ -101,7 +109,7 @@ int criar_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int tamanho) {
     
     printf("Processo %d criado com sucesso!\n", processo->id);
     printf("  - Tamanho: %d bytes\n", processo->tamanho);
-    printf("  - Páginas: %d\n", processo->num_paginas);
+    printf("  - Paginas: %d\n", processo->num_paginas);
     
     return processo->id;
 }
@@ -109,7 +117,7 @@ int criar_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int tamanho) {
 int alocar_quadros_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int id_processo) {
     Processo *processo = encontrar_processo(gp, id_processo);
     if (!processo) {
-        printf("Erro: Processo %d não encontrado.\n", id_processo);
+        printf("Erro: Processo %d nao encontrado.\n", id_processo);
         return 0;
     }
     
@@ -118,7 +126,7 @@ int alocar_quadros_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int id_
     for (int i = 0; i < processo->num_paginas; i++) {
         int quadro = alocar_quadro(mf);
         if (quadro == -1) {
-            printf("Erro: Não há quadros suficientes para alocar a página %d do processo %d.\n", 
+            printf("Erro: Nao ha quadros suficientes para alocar a pagina %d do processo %d.\n", 
                    i, id_processo);
             
             // Libera os quadros já alocados
@@ -134,7 +142,7 @@ int alocar_quadros_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int id_
         processo->tabela_paginas[i].presente = 1;
         processo->tabela_paginas[i].modificada = 0;
         
-        printf("  Página %d -> Quadro %d\n", i, quadro);
+        printf("  Pagina %d -> Quadro %d\n", i, quadro);
     }
     
     return 1;
@@ -143,21 +151,21 @@ int alocar_quadros_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int id_
 void copiar_memoria_logica_para_fisica(GerenciadorProcessos *gp, MemoriaFisica *mf, int id_processo) {
     Processo *processo = encontrar_processo(gp, id_processo);
     if (!processo) {
-        printf("Erro: Processo %d não encontrado.\n", id_processo);
+        printf("Erro: Processo %d nao encontrado.\n", id_processo);
         return;
     }
     
-    printf("Copiando dados da memória lógica para a física do processo %d...\n", id_processo);
+    printf("Copiando dados da memoria logica para a fisica do processo %d...\n", id_processo);
     
     for (int pagina = 0; pagina < processo->num_paginas; pagina++) {
         if (processo->tabela_paginas[pagina].presente) {
             int quadro = processo->tabela_paginas[pagina].quadro_fisico;
-            int endereco_fisico_base = quadro * TAMANHO_PAGINA;
-            int endereco_logico_base = pagina * TAMANHO_PAGINA;
+            int endereco_fisico_base = quadro * mf->tamanho_pagina;
+            int endereco_logico_base = pagina * mf->tamanho_pagina;
             
             // Calcula quantos bytes copiar para esta página
-            int bytes_para_copiar = TAMANHO_PAGINA;
-            if (endereco_logico_base + TAMANHO_PAGINA > processo->tamanho) {
+            int bytes_para_copiar = mf->tamanho_pagina;
+            if (endereco_logico_base + mf->tamanho_pagina > processo->tamanho) {
                 bytes_para_copiar = processo->tamanho - endereco_logico_base;
             }
             
@@ -167,7 +175,7 @@ void copiar_memoria_logica_para_fisica(GerenciadorProcessos *gp, MemoriaFisica *
                 escrever_na_memoria(mf, endereco_fisico_base + i, valor);
             }
             
-            printf("  Página %d: %d bytes copiados para o quadro %d\n", 
+            printf("  Pagina %d: %d bytes copiados para o quadro %d\n", 
                    pagina, bytes_para_copiar, quadro);
         }
     }
@@ -176,15 +184,15 @@ void copiar_memoria_logica_para_fisica(GerenciadorProcessos *gp, MemoriaFisica *
 void visualizar_tabela_paginas(GerenciadorProcessos *gp, int id_processo) {
     Processo *processo = encontrar_processo(gp, id_processo);
     if (!processo) {
-        printf("Erro: Processo %d não encontrado.\n", id_processo);
+        printf("Erro: Processo %d nao encontrado.\n", id_processo);
         return;
     }
     
-    printf("\n=== TABELA DE PÁGINAS - PROCESSO %d ===\n", id_processo);
+    printf("\n=== TABELA DE PAGINAS - PROCESSO %d ===\n", id_processo);
     printf("Tamanho do processo: %d bytes\n", processo->tamanho);
-    printf("Número de páginas: %d\n", processo->num_paginas);
+    printf("Numero de paginas: %d\n", processo->num_paginas);
     printf("\n");
-    printf("Página | Quadro Físico | Presente | Modificada\n");
+    printf("Pagina | Quadro Fisico | Presente | Modificada\n");
     printf("-------|---------------|----------|-----------\n");
     
     for (int i = 0; i < processo->num_paginas; i++) {
@@ -192,32 +200,10 @@ void visualizar_tabela_paginas(GerenciadorProcessos *gp, int id_processo) {
         printf("%6d | %13d | %8s | %10s\n", 
                i,
                entrada->quadro_fisico,
-               entrada->presente ? "Sim" : "Não",
-               entrada->modificada ? "Sim" : "Não");
+               entrada->presente ? "Sim" : "Nao",
+               entrada->modificada ? "Sim" : "Nao");
     }
     
-    printf("\n");
-    
-    // Mostra estatísticas
-    int paginas_presentes = 0;
-    int paginas_modificadas = 0;
-    
-    for (int i = 0; i < processo->num_paginas; i++) {
-        if (processo->tabela_paginas[i].presente) {
-            paginas_presentes++;
-        }
-        if (processo->tabela_paginas[i].modificada) {
-            paginas_modificadas++;
-        }
-    }
-    
-    printf("Estatísticas:\n");
-    printf("  - Páginas presentes na memória: %d/%d (%.1f%%)\n", 
-           paginas_presentes, processo->num_paginas, 
-           (float)paginas_presentes / processo->num_paginas * 100);
-    printf("  - Páginas modificadas: %d/%d (%.1f%%)\n", 
-           paginas_modificadas, processo->num_paginas,
-           (float)paginas_modificadas / processo->num_paginas * 100);
     printf("\n");
 }
 
@@ -233,59 +219,56 @@ Processo* encontrar_processo(GerenciadorProcessos *gp, int id_processo) {
 int remover_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int id_processo) {
     Processo *processo = encontrar_processo(gp, id_processo);
     if (!processo) {
-        printf("Erro: Processo %d não encontrado.\n", id_processo);
+        printf("Erro: Processo %d nao encontrado.\n", id_processo);
         return 0;
     }
     
     printf("Removendo processo %d...\n", id_processo);
     
-    // Libera todos os quadros alocados pelo processo
+    // Libera os quadros físicos alocados
     for (int i = 0; i < processo->num_paginas; i++) {
         if (processo->tabela_paginas[i].presente) {
             liberar_quadro(mf, processo->tabela_paginas[i].quadro_fisico);
-            printf("  Quadro %d liberado (página %d)\n", 
-                   processo->tabela_paginas[i].quadro_fisico, i);
+            printf("  Quadro %d liberado\n", processo->tabela_paginas[i].quadro_fisico);
         }
     }
     
-    // Marca o processo como inativo
+    // Libera a memória do processo
+    liberar_processo(processo);
+    
+    // Marca o slot como livre
     processo->ativo = 0;
     processo->id = 0;
     processo->tamanho = 0;
     processo->num_paginas = 0;
     
-    // Limpa a tabela de páginas
-    for (int i = 0; i < MAX_PAGINAS_PROCESSO; i++) {
-        processo->tabela_paginas[i].quadro_fisico = -1;
-        processo->tabela_paginas[i].presente = 0;
-        processo->tabela_paginas[i].modificada = 0;
-    }
-    
     gp->num_processos--;
     
-    printf("Processo %d removido com sucesso!\n", id_processo);
+    printf("Processo %d removido com sucesso.\n", id_processo);
     return 1;
 }
 
 void listar_processos(GerenciadorProcessos *gp) {
     printf("\n=== LISTA DE PROCESSOS ===\n");
-    
-    if (gp->num_processos == 0) {
-        printf("Nenhum processo ativo.\n");
-        return;
-    }
-    
-    printf("ID | Tamanho (bytes) | Páginas | Status\n");
-    printf("---|-----------------|---------|--------\n");
+    printf("ID | Tamanho | Paginas | Status\n");
+    printf("---|---------|---------|--------\n");
     
     for (int i = 0; i < MAX_PROCESSOS; i++) {
         if (gp->processos[i].ativo) {
-            Processo *p = &gp->processos[i];
-            printf("%2d | %15d | %7d | Ativo\n", 
-                   p->id, p->tamanho, p->num_paginas);
+            printf("%2d | %7d | %7d | Ativo\n", 
+                   gp->processos[i].id,
+                   gp->processos[i].tamanho,
+                   gp->processos[i].num_paginas);
         }
     }
     
-    printf("\nTotal de processos ativos: %d\n", gp->num_processos);
-    printf("\n");
+    printf("Total de processos ativos: %d\n", gp->num_processos);
+    printf("==========================\n\n");
+}
+
+void liberar_processo(Processo *processo) {
+    if (processo && processo->tabela_paginas) {
+        free(processo->tabela_paginas);
+        processo->tabela_paginas = NULL;
+    }
 } 
