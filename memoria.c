@@ -26,7 +26,7 @@ int alocar_quadro(MemoriaFisica *mf) {
 }
 
 void liberar_quadro(MemoriaFisica *mf, int quadro_index) {
-    if (quadro_index >= 0 && quadro_index < NUMERO_quadroS) {
+    if (quadro_index >= 0 && quadro_index < NUMERO_QUADROS) {
         if (mf->quadro_livre[quadro_index] == 0) {
             mf->quadro_livre[quadro_index] = 1; // Marca como livre
             printf("Quadro %d liberado.\n", quadro_index);
