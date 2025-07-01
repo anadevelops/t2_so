@@ -6,9 +6,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-// Tamanho máximo de processo (potência de 2)
-#define TAMANHO_MAX_PROCESSO (64 * 1024) // 64 KB
-
 // Número máximo de processos suportados
 #define MAX_PROCESSOS 10
 
@@ -23,7 +20,7 @@ typedef struct {
 typedef struct {
     int id;                                    // ID único do processo
     int tamanho;                              // Tamanho da memória lógica em bytes
-    unsigned char memoria_logica[TAMANHO_MAX_PROCESSO]; // Memória lógica do processo
+    unsigned char *memoria_logica; // Memória lógica do processo
     EntradaTabelaPagina *tabela_paginas;      // Tabela de páginas (alocada dinamicamente)
     int num_paginas;                          // Número de páginas utilizadas pelo processo
     int ativo;                                // 1 se o processo está ativo, 0 caso contrário
@@ -36,7 +33,7 @@ typedef struct {
     int proximo_id;
 } GerenciadorProcessos;
 
-// Protótipos das funções de gerenciamento de processos
+// Funções de gerenciamento de processos
 
 /**
  * @brief Inicializa o gerenciador de processos.
@@ -53,9 +50,10 @@ void inicializar_gerenciador_processos(GerenciadorProcessos *gp);
  * @param id_processo ID específico do processo.
  * @param tamanho Tamanho do processo em bytes.
  * @param tamanho_pagina Tamanho da página em bytes.
+ * @param tamanho_max_processo Tamanho máximo do processo em bytes.
  * @return ID do processo criado, ou -1 se falhar.
  */
-int criar_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int id_processo, int tamanho, int tamanho_pagina);
+int criar_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int id_processo, int tamanho, int tamanho_pagina, int tamanho_max_processo);
 
 /**
  * @brief Aloca quadros físicos para as páginas de um processo.

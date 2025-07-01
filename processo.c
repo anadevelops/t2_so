@@ -36,7 +36,7 @@ void gerar_dados_aleatorios_processo(Processo *processo) {
            processo->id, processo->tamanho);
 }
 
-int criar_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int id_processo, int tamanho, int tamanho_pagina) {
+int criar_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int id_processo, int tamanho, int tamanho_pagina, int tamanho_max_processo) {
     // Verifica se há espaço para mais processos
     if (gp->num_processos >= MAX_PROCESSOS) {
         printf("Erro: Numero maximo de processos atingido (%d).\n", MAX_PROCESSOS);
@@ -50,9 +50,9 @@ int criar_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int id_processo,
     }
     
     // Verifica se o tamanho é válido
-    if (tamanho <= 0 || tamanho > TAMANHO_MAX_PROCESSO) {
+    if (tamanho <= 0 || tamanho > tamanho_max_processo) {
         printf("Erro: Tamanho de processo invalido (%d). Deve estar entre 1 e %d bytes.\n", 
-               tamanho, TAMANHO_MAX_PROCESSO);
+               tamanho, tamanho_max_processo);
         return -1;
     }
     
@@ -90,6 +90,16 @@ int criar_processo(GerenciadorProcessos *gp, MemoriaFisica *mf, int id_processo,
         processo->tabela_paginas[i].quadro_fisico = -1;
         processo->tabela_paginas[i].presente = 0;
         processo->tabela_paginas[i].modificada = 0;
+    }
+    
+    // Aloca a memória lógica dinamicamente
+    processo->memoria_logica = (unsigned char*)malloc(tamanho);
+    if (!processo->memoria_logica) {
+        printf("Erro: Falha ao alocar memoria logica para o processo %d.\n", processo->id);
+        processo->ativo = 0;
+        free(processo->tabela_paginas);
+        processo->tabela_paginas = NULL;
+        return -1;
     }
     
     // Gera dados aleatórios para a memória lógica
@@ -163,18 +173,23 @@ void copiar_memoria_logica_para_fisica(GerenciadorProcessos *gp, MemoriaFisica *
             int endereco_fisico_base = quadro * mf->tamanho_pagina;
             int endereco_logico_base = pagina * mf->tamanho_pagina;
             
+            // Se o endereço lógico base já está fora do tamanho do processo, não copia nada
+            if (endereco_logico_base >= processo->tamanho) {
+                continue;
+            }
             // Calcula quantos bytes copiar para esta página
             int bytes_para_copiar = mf->tamanho_pagina;
             if (endereco_logico_base + mf->tamanho_pagina > processo->tamanho) {
                 bytes_para_copiar = processo->tamanho - endereco_logico_base;
             }
-            
+            if (bytes_para_copiar <= 0) {
+                continue;
+            }
             // Copia os dados
             for (int i = 0; i < bytes_para_copiar; i++) {
                 unsigned char valor = processo->memoria_logica[endereco_logico_base + i];
                 escrever_na_memoria(mf, endereco_fisico_base + i, valor);
             }
-            
             printf("  Pagina %d: %d bytes copiados para o quadro %d\n", 
                    pagina, bytes_para_copiar, quadro);
         }
@@ -267,8 +282,14 @@ void listar_processos(GerenciadorProcessos *gp) {
 }
 
 void liberar_processo(Processo *processo) {
-    if (processo && processo->tabela_paginas) {
-        free(processo->tabela_paginas);
-        processo->tabela_paginas = NULL;
+    if (processo) {
+        if (processo->tabela_paginas) {
+            free(processo->tabela_paginas);
+            processo->tabela_paginas = NULL;
+        }
+        if (processo->memoria_logica) {
+            free(processo->memoria_logica);
+            processo->memoria_logica = NULL;
+        }
     }
 } 

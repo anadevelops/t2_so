@@ -59,7 +59,7 @@ void visualizar_memoria_completa(MemoriaFisica *mf) {
     printf("==========================================\n\n");
 }
 
-void criar_processo_interativo(GerenciadorProcessos *gp, MemoriaFisica *mf) {
+void criar_processo_interativo(GerenciadorProcessos *gp, MemoriaFisica *mf, int tamanho_max_processo) {
     int id_processo, tamanho_processo;
     
     printf("\n=== CRIAR PROCESSO ===\n");
@@ -73,11 +73,11 @@ void criar_processo_interativo(GerenciadorProcessos *gp, MemoriaFisica *mf) {
         printf("Digite o tamanho do processo em bytes: ");
         scanf("%d", &tamanho_processo);
         
-        if (tamanho_processo > TAMANHO_MAX_PROCESSO) {
-            printf("Erro: Tamanho maior que o maximo permitido (%d bytes).\n", TAMANHO_MAX_PROCESSO);
-            printf("Digite um valor menor ou igual a %d bytes.\n", TAMANHO_MAX_PROCESSO);
+        if (tamanho_processo > tamanho_max_processo) {
+            printf("Erro: Tamanho maior que o maximo permitido (%d bytes).\n", tamanho_max_processo);
+            printf("Digite um valor menor ou igual a %d bytes.\n", tamanho_max_processo);
         }
-    } while (tamanho_processo > TAMANHO_MAX_PROCESSO);
+    } while (tamanho_processo > tamanho_max_processo);
     
     if (tamanho_processo <= 0) {
         printf("Erro: Tamanho deve ser maior que zero.\n");
@@ -85,7 +85,7 @@ void criar_processo_interativo(GerenciadorProcessos *gp, MemoriaFisica *mf) {
     }
     
     // Cria o processo
-    int resultado = criar_processo(gp, mf, id_processo, tamanho_processo, mf->tamanho_pagina);
+    int resultado = criar_processo(gp, mf, id_processo, tamanho_processo, mf->tamanho_pagina, tamanho_max_processo);
     
     if (resultado == -1) {
         printf("Erro: Nao foi possivel criar o processo. Memoria insuficiente ou erro interno.\n");
@@ -112,6 +112,7 @@ void visualizar_tabela_paginas_interativo(GerenciadorProcessos *gp) {
 
 int main() {
     int tamanho_mb, tamanho_pagina_kb;
+    int tamanho_max_processo;
     
     printf("=== Simulador de Gerenciamento de Memoria ===\n");
     printf("Digite o tamanho da memoria fisica em MB: ");
@@ -119,6 +120,9 @@ int main() {
     
     printf("Digite o tamanho da pagina/quadro em KB: ");
     scanf("%d", &tamanho_pagina_kb);
+    
+    printf("Digite o tamanho maximo de um processo em bytes: ");
+    scanf("%d", &tamanho_max_processo);
     
     // Validação básica dos parâmetros
     if (tamanho_mb <= 0) {
@@ -128,6 +132,10 @@ int main() {
     
     if (tamanho_pagina_kb <= 0) {
         printf("Erro: Tamanho da pagina deve ser maior que zero.\n");
+        return 1;
+    }
+    if (tamanho_max_processo <= 0) {
+        printf("Erro: Tamanho maximo de processo deve ser maior que zero.\n");
         return 1;
     }
     
@@ -157,7 +165,7 @@ int main() {
                 break;
                 
             case 2:
-                criar_processo_interativo(&gp, mf);
+                criar_processo_interativo(&gp, mf, tamanho_max_processo);
                 break;
                 
             case 3:

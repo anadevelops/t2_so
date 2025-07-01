@@ -13,7 +13,7 @@ typedef struct {
     int numero_quadros;               // Número total de quadros na memória física
 } MemoriaFisica;
 
-// Protótipos das funções de gerenciamento da memória física
+// Funções de gerenciamento da memória física
 
 /**
  * @brief Cria e inicializa a memória física com tamanho e tamanho de quadro especificados pelo usuário.
