@@ -20,7 +20,7 @@ typedef struct {
 typedef struct {
     int id;                                    // ID único do processo
     int tamanho;                              // Tamanho da memória lógica em bytes
-    unsigned char *memoria_logica; // Memória lógica do processo
+    unsigned char *memoria_logica;            // Memória lógica do processo
     EntradaTabelaPagina *tabela_paginas;      // Tabela de páginas (alocada dinamicamente)
     int num_paginas;                          // Número de páginas utilizadas pelo processo
     int ativo;                                // 1 se o processo está ativo, 0 caso contrário
